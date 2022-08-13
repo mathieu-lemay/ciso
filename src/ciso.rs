@@ -11,27 +11,27 @@ use serde::Deserialize;
 
 #[derive(Debug)]
 pub enum CisoError {
-    DecompressError(&'static str),
-    IoError(io::Error),
-    BincodeError(bincode::ErrorKind),
-    Utf8Error(Utf8Error),
+    Decompress(&'static str),
+    Io(io::Error),
+    Bincode(bincode::ErrorKind),
+    Utf8(Utf8Error),
 }
 
 impl From<io::Error> for CisoError {
     fn from(e: io::Error) -> Self {
-        CisoError::IoError(e)
+        CisoError::Io(e)
     }
 }
 
 impl From<Box<bincode::ErrorKind>> for CisoError {
     fn from(e: Box<bincode::ErrorKind>) -> Self {
-        CisoError::BincodeError(*e)
+        CisoError::Bincode(*e)
     }
 }
 
 impl From<Utf8Error> for CisoError {
     fn from(e: Utf8Error) -> Self {
-        CisoError::Utf8Error(e)
+        CisoError::Utf8(e)
     }
 }
 
@@ -64,11 +64,11 @@ pub fn decompress_ciso(ciso_file: &Path, output_file: &Path) -> Result<()> {
 
     let magic = std::str::from_utf8(&header.magic)?;
     if magic != "CISO" || header.block_size == 0 || header.total_bytes == 0 {
-        return Err(CisoError::DecompressError("Invalid header"));
+        return Err(CisoError::Decompress("Invalid header"));
     }
 
     if header.align != 0 {
-        return Err(CisoError::DecompressError("Align != 0 not supported"));
+        return Err(CisoError::Decompress("Align != 0 not supported"));
     }
 
     let total_blocks = header.total_bytes as usize / header.block_size as usize;
@@ -104,11 +104,11 @@ pub fn decompress_ciso(ciso_file: &Path, output_file: &Path) -> Result<()> {
         reader.read_exact(&mut input_buffer)?;
 
         if plain {
-            writer.write(&input_buffer)?;
+            writer.write_all(&input_buffer)?;
         } else {
             let mut z = DeflateDecoder::new(&input_buffer[..]);
             let out_size = z.read_to_end(&mut output_buffer)?;
-            writer.write(&output_buffer[0..out_size])?;
+            writer.write_all(&output_buffer[0..out_size])?;
         }
     }
 

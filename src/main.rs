@@ -27,8 +27,8 @@ fn main() {
     let start = Instant::now();
 
     ciso::decompress_ciso(
-        &Path::new(&cli_args.input_file),
-        &Path::new(&cli_args.output_file),
+        Path::new(&cli_args.input_file),
+        Path::new(&cli_args.output_file),
     )
     .expect("Error decompressing CISO");
 
