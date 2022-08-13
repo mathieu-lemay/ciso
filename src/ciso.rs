@@ -74,6 +74,11 @@ pub fn decompress_ciso(ciso_file: &Path, output_file: &Path) -> Result<()> {
 
     let total_blocks = header.total_bytes as usize / header.block_size as usize;
 
+    println!("Decompressing {:?} to {:?}", ciso_file, output_file);
+    println!("Total File Size: {} bytes", header.total_bytes);
+    println!("Block Size:      {} bytes", header.block_size);
+    println!("Total Blocks:    {} blocks", total_blocks);
+
     let mut index_buffer = vec![0u32; total_blocks + 1];
     reader.read_u32_into::<LittleEndian>(&mut index_buffer)?;
 
@@ -108,15 +113,11 @@ pub fn decompress_ciso(ciso_file: &Path, output_file: &Path) -> Result<()> {
             let out = decompress_to_vec(&input_buffer).unwrap();
             writer.write_all(&out)?;
         }
+
+        print!("\rBlock {} / {}", block, total_blocks);
     }
+
+    println!();
 
     Ok(())
-}
-
-#[cfg(test)]
-mod test {
-    #[test]
-    fn test_something() {
-        assert!(false);
-    }
 }
