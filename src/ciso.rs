@@ -6,8 +6,9 @@ use std::path::Path;
 use std::str::Utf8Error;
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use flate2::bufread::DeflateDecoder;
 use serde::Deserialize;
+
+use miniz_oxide::inflate::decompress_to_vec;
 
 #[derive(Debug)]
 pub enum CisoError {
@@ -76,8 +77,6 @@ pub fn decompress_ciso(ciso_file: &Path, output_file: &Path) -> Result<()> {
     let mut index_buffer = vec![0u32; total_blocks + 1];
     reader.read_u32_into::<LittleEndian>(&mut index_buffer)?;
 
-    let mut output_buffer = vec![0u8; header.block_size as usize];
-
     let out_f = File::create(output_file)?;
     let mut writer = BufWriter::new(out_f);
 
@@ -106,9 +105,8 @@ pub fn decompress_ciso(ciso_file: &Path, output_file: &Path) -> Result<()> {
         if plain {
             writer.write_all(&input_buffer)?;
         } else {
-            let mut z = DeflateDecoder::new(&input_buffer[..]);
-            let out_size = z.read_to_end(&mut output_buffer)?;
-            writer.write_all(&output_buffer[0..out_size])?;
+            let out = decompress_to_vec(&input_buffer).unwrap();
+            writer.write_all(&out)?;
         }
     }
 
