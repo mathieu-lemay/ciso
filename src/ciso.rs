@@ -1,13 +1,15 @@
-use std::fmt::{self, Debug, Display};
+use std::fmt::Debug;
 use std::fs::File;
-use std::io::{self, BufReader, Cursor, Read, Seek};
+use std::io::{self, BufReader, BufWriter, Cursor, Read, Write};
 use std::mem::size_of;
 use std::path::Path;
 use std::str::Utf8Error;
 
 use byteorder::{LittleEndian, ReadBytesExt};
+use flate2::bufread::DeflateDecoder;
 use serde::Deserialize;
 
+#[derive(Debug)]
 pub enum CisoError {
     DecompressError(&'static str),
     IoError(io::Error),
@@ -33,12 +35,6 @@ impl From<Utf8Error> for CisoError {
     }
 }
 
-impl Debug for CisoError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        Display::fmt(&format!("{:?}", &self), f)
-    }
-}
-
 type Result<T> = std::result::Result<T, CisoError>;
 
 #[derive(Debug, Deserialize)]
@@ -57,16 +53,13 @@ fn read_header<T: Read>(reader: &mut T) -> Result<Header> {
 
     reader.read_exact(&mut buf)?;
 
-    let header: Header = bincode::deserialize_from(Cursor::new(buf))?;
-    println!("Header: {:#?}", header);
-
-    Ok(header)
+    Ok(bincode::deserialize_from(Cursor::new(buf))?)
 }
 
-pub fn decompress_ciso(ciso_file: &Path, _output_file: &Path) -> Result<()> {
-    let f = File::open(ciso_file)?;
+pub fn decompress_ciso(ciso_file: &Path, output_file: &Path) -> Result<()> {
+    let in_f = File::open(ciso_file)?;
 
-    let mut reader = BufReader::new(f);
+    let mut reader = BufReader::new(in_f);
     let header = read_header(&mut reader)?;
 
     let magic = std::str::from_utf8(&header.magic)?;
@@ -83,6 +76,13 @@ pub fn decompress_ciso(ciso_file: &Path, _output_file: &Path) -> Result<()> {
     let mut index_buffer = vec![0u32; total_blocks + 1];
     reader.read_u32_into::<LittleEndian>(&mut index_buffer)?;
 
+    let mut output_buffer = vec![0u8; header.block_size as usize];
+
+    let out_f = File::create(output_file)?;
+    let mut writer = BufWriter::new(out_f);
+
+    let mut input_buffer = Vec::new();
+
     for block in 0..total_blocks {
         let index = index_buffer[block] & 0x7fffffff;
         let plain = (index_buffer[block] & 0x80000000) > 0;
@@ -98,8 +98,27 @@ pub fn decompress_ciso(ciso_file: &Path, _output_file: &Path) -> Result<()> {
                 )
             }
             index2 - index
-        };
+        } as u64;
+
+        input_buffer.resize(read_size as usize, 0);
+        reader.read_exact(&mut input_buffer)?;
+
+        if plain {
+            writer.write(&input_buffer)?;
+        } else {
+            let mut z = DeflateDecoder::new(&input_buffer[..]);
+            let out_size = z.read_to_end(&mut output_buffer)?;
+            writer.write(&output_buffer[0..out_size])?;
+        }
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_something() {
+        assert!(false);
+    }
 }

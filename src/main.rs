@@ -1,5 +1,6 @@
 use clap::{ArgGroup, Parser};
 use std::path::Path;
+use std::time::Instant;
 
 mod ciso;
 
@@ -22,11 +23,15 @@ struct CliArgs {
 
 fn main() {
     let cli_args = CliArgs::parse();
-    println!("Args: {:#?}", cli_args);
+
+    let start = Instant::now();
 
     ciso::decompress_ciso(
         &Path::new(&cli_args.input_file),
         &Path::new(&cli_args.output_file),
     )
     .expect("Error decompressing CISO");
+
+    let t = start.elapsed().as_micros() as f64 / 1000.0;
+    println!("Duration: {:.3}ms", t);
 }
