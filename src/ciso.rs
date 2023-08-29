@@ -85,8 +85,6 @@ pub fn decompress_ciso(ciso_file: &Path, output_file: &Path) -> Result<()> {
     let out_f = File::create(output_file)?;
     let mut writer = BufWriter::new(out_f);
 
-    let mut input_buffer = Vec::new();
-
     for block in 0..total_blocks {
         let index = index_buffer[block] & 0x7fffffff;
         let plain = (index_buffer[block] & 0x80000000) > 0;
@@ -102,9 +100,10 @@ pub fn decompress_ciso(ciso_file: &Path, output_file: &Path) -> Result<()> {
                 )
             }
             index2 - index
-        } as u64;
+        } as usize;
 
-        input_buffer.resize(read_size as usize, 0);
+        let mut input_buffer = Vec::new();
+        input_buffer.resize(read_size, 0);
         reader.read_exact(&mut input_buffer)?;
 
         if plain {
